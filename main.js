@@ -77,6 +77,33 @@ scene.add(directionalLight);
 // --- Controls ---
 const controls = new OrbitControls(camera, renderer.domElement);
 
+const curve = new THREE.CatmullRomCurve3( [
+	new THREE.Vector3( -10, 0, 10 ),
+	new THREE.Vector3( -5, 5, 5 ),
+	new THREE.Vector3( 0, 0, 0 ),
+	new THREE.Vector3( 5, -5, 5 ),
+	new THREE.Vector3( 10, 0, 10 )
+] );
+
+const points = curve.getPoints( 50 );
+renderTrack(points, 'hard-coded-track', 0xff00ff);
+// renderTerrain(points);
+
+// --- Adjust Camera ---
+const boundingBox = new THREE.Box3().setFromPoints(points);
+const center = new THREE.Vector3();
+boundingBox.getCenter(center);
+const size = new THREE.Vector3();
+boundingBox.getSize(size);
+
+const maxDim = Math.max(size.x, size.y, size.z);
+const fov = camera.fov * (Math.PI / 180);
+let cameraZ = Math.abs((maxDim / 2) * Math.tan(fov * 2));
+cameraZ *= 1.5; // Add some padding
+
+camera.position.set(center.x, center.y, center.z + cameraZ);
+controls.target.copy(center);
+
 // --- GPX File Loading ---
 const fileInput = document.getElementById('gpx-file');
 fileInput.addEventListener('change', handleFileUpload);
@@ -88,8 +115,10 @@ function handleFileUpload(event) {
   const reader = new FileReader();
   reader.onload = (e) => {
     const gpxData = e.target.result;
+    console.log('GPX data loaded from file');
     
     try {
+      console.log('Parsing GPX data from file');
       const [parsedFile, error] = parseGPX(gpxData);
 
       if (error) {
@@ -102,6 +131,7 @@ function handleFileUpload(event) {
         return;
       }
 
+      console.log('GPX data parsed successfully from file');
       const points = parsedFile.tracks[0].points.map((p) => ({
         x: p.lon,
         y: p.lat,
@@ -116,6 +146,7 @@ function handleFileUpload(event) {
       const minZ = Math.min(...points.map((p) => p.z));
       const maxZ = Math.max(...points.map((p) => p.z));
 
+      console.log('Normalizing coordinates from file');
       const normalizedPoints = points.map((p) => {
         if (p.lon === undefined || p.lat === undefined || p.ele === undefined) {
           return null;
@@ -126,6 +157,7 @@ function handleFileUpload(event) {
         return new THREE.Vector3(x, y, z);
       }).filter(p => p !== null);
 
+      console.log('Normalized Points from file:', normalizedPoints);
       renderTrack(normalizedPoints, 'gpx-track', 0x00ffff);
       renderTerrain(normalizedPoints);
 
@@ -136,6 +168,9 @@ function handleFileUpload(event) {
       const size = new THREE.Vector3();
       boundingBox.getSize(size);
 
+      console.log('GPX Bounding Box Center from file:', center);
+      console.log('GPX Bounding Box Size from file:', size);
+
       const maxDim = Math.max(size.x, size.y, size.z);
       const fov = camera.fov * (Math.PI / 180);
       let cameraZ = Math.abs((maxDim / 2) * Math.tan(fov * 2));
@@ -143,8 +178,11 @@ function handleFileUpload(event) {
 
       camera.position.set(center.x, center.y, center.z + cameraZ);
       controls.target.copy(center);
+
+      console.log('Camera Position from file:', camera.position);
+      console.log('Controls Target from file:', controls.target);
     } catch (e) {
-      console.error('Error processing GPX data:', e);
+      console.error('Error processing GPX data from file:', e);
     }
   };
   reader.readAsText(file);
