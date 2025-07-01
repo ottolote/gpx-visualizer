@@ -79,50 +79,58 @@ const controls = new OrbitControls(camera, renderer.domElement);
 
 // --- GPX File Loading ---
 const fileInput = document.getElementById('gpx-file');
-// fileInput.addEventListener('change', handleFileUpload);
+fileInput.addEventListener('change', handleFileUpload);
 
-// function handleFileUpload(event) {
-//   const file = event.target.files[0];
-//   if (!file) return;
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
 
-//   const reader = new FileReader();
-//   reader.onload = async (e) => {
-//     const gpxData = e.target.result;
-//     const gpxPoints = await loadAndRenderGpx(gpxData);
-//     if (gpxPoints) {
-//       renderTrack(gpxPoints, 'gpx-track', 0x00ffff);
-//       renderTerrain(gpxPoints);
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const gpxData = e.target.result;
+    
+    try {
+      const [parsedFile, error] = parseGPX(gpxData);
 
-//       // --- Adjust Camera ---
-//       const boundingBox = new THREE.Box3().setFromPoints(gpxPoints);
-//       const center = new THREE.Vector3();
-//       boundingBox.getCenter(center);
-//       const size = new THREE.Vector3();
-//       boundingBox.getSize(size);
+      if (error) {
+        console.error('Error parsing GPX file:', error);
+        return;
+      }
 
-//       const maxDim = Math.max(size.x, size.y, size.z);
-//       const fov = camera.fov * (Math.PI / 180);
-//       let cameraZ = Math.abs((maxDim / 2) * Math.tan(fov * 2));
-//       cameraZ *= 1.5; // Add some padding
+      if (!parsedFile.tracks || parsedFile.tracks.length === 0) {
+        console.error('No tracks found in GPX file.');
+        return;
+      }
 
-//       camera.position.set(center.x, center.y, center.z + cameraZ);
-//       controls.target.copy(center);
-//     }
-//   };
-//   reader.readAsText(file);
-// }
+      const points = parsedFile.tracks[0].points.map((p) => ({
+        x: p.lon,
+        y: p.lat,
+        z: p.ele,
+      }));
 
-// Load default GPX file
-fetch('/Trebeurden_Lannion_parcours13.2RE.gpx')
-  .then((response) => response.text())
-  .then((gpxData) => {
-    const gpxPoints = loadAndRenderGpx(gpxData);
-    if (gpxPoints) {
-      renderTrack(gpxPoints, 'gpx-track', 0x00ffff);
-      renderTerrain(gpxPoints);
+      // --- Normalize Coordinates ---
+      const minX = Math.min(...points.map((p) => p.x));
+      const maxX = Math.max(...points.map((p) => p.x));
+      const minY = Math.min(...points.map((p) => p.y));
+      const maxY = Math.max(...points.map((p) => p.y));
+      const minZ = Math.min(...points.map((p) => p.z));
+      const maxZ = Math.max(...points.map((p) => p.z));
+
+      const normalizedPoints = points.map((p) => {
+        if (p.lon === undefined || p.lat === undefined || p.ele === undefined) {
+          return null;
+        }
+        const x = THREE.MathUtils.mapLinear(p.x, minX, maxX, -5, 5);
+        const y = THREE.MathUtils.mapLinear(p.z, minZ, maxZ, 0, 2);
+        const z = THREE.MathUtils.mapLinear(p.y, minY, maxY, -5, 5);
+        return new THREE.Vector3(x, y, z);
+      }).filter(p => p !== null);
+
+      renderTrack(normalizedPoints, 'gpx-track', 0x00ffff);
+      renderTerrain(normalizedPoints);
 
       // --- Adjust Camera ---
-      const boundingBox = new THREE.Box3().setFromPoints(gpxPoints);
+      const boundingBox = new THREE.Box3().setFromPoints(normalizedPoints);
       const center = new THREE.Vector3();
       boundingBox.getCenter(center);
       const size = new THREE.Vector3();
@@ -135,63 +143,11 @@ fetch('/Trebeurden_Lannion_parcours13.2RE.gpx')
 
       camera.position.set(center.x, center.y, center.z + cameraZ);
       controls.target.copy(center);
+    } catch (e) {
+      console.error('Error processing GPX data:', e);
     }
-  });
-
-const curve = new THREE.CatmullRomCurve3( [
-	new THREE.Vector3( -10, 0, 10 ),
-	new THREE.Vector3( -5, 5, 5 ),
-	new THREE.Vector3( 0, 0, 0 ),
-	new THREE.Vector3( 5, -5, 5 ),
-	new THREE.Vector3( 10, 0, 10 )
-] );
-
-const points = curve.getPoints( 50 );
-renderTrack(points, 'hard-coded-track', 0xff00ff);
-
-function loadAndRenderGpx(gpxData) {
-  try {
-    const [parsedFile, error] = parseGPX(gpxData);
-
-    if (error) {
-      console.error('Error parsing GPX file:', error);
-      return null;
-    }
-
-    if (!parsedFile.tracks || parsedFile.tracks.length === 0) {
-      console.error('No tracks found in GPX file.');
-      return null;
-    }
-
-    const points = parsedFile.tracks[0].points.map((p) => ({
-      x: p.lon,
-      y: p.lat,
-      z: p.ele,
-    }));
-
-    // --- Normalize Coordinates ---
-    const minX = Math.min(...points.map((p) => p.x));
-    const maxX = Math.max(...points.map((p) => p.x));
-    const minY = Math.min(...points.map((p) => p.y));
-    const maxY = Math.max(...points.map((p) => p.y));
-    const minZ = Math.min(...points.map((p) => p.z));
-    const maxZ = Math.max(...points.map((p) => p.z));
-
-    const normalizedPoints = points.map((p) => {
-      if (p.lon === undefined || p.lat === undefined || p.ele === undefined) {
-        return null;
-      }
-      const x = THREE.MathUtils.mapLinear(p.x, minX, maxX, -5, 5);
-      const y = THREE.MathUtils.mapLinear(p.z, minZ, maxZ, 0, 2);
-      const z = THREE.MathUtils.mapLinear(p.y, minY, maxY, -5, 5);
-      return new THREE.Vector3(x, y, z);
-    }).filter(p => p !== null);
-
-    return normalizedPoints;
-  } catch (e) {
-    console.error('Error processing GPX data:', e);
-    return null;
-  }
+  };
+  reader.readAsText(file);
 }
 
 
