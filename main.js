@@ -119,20 +119,20 @@ function handleFileUpload(event) {
     
     try {
       console.log('Parsing GPX data from file');
-      const [parsedFile, error] = parseGPX(gpxData);
+      const [parsed, error] = parseGPX(gpxData);
 
       if (error) {
         console.error('Error parsing GPX file:', error);
         return;
       }
 
-      if (!parsedFile.tracks || parsedFile.tracks.length === 0) {
+      if (!parsed.tracks || parsed.tracks.length === 0) {
         console.error('No tracks found in GPX file.');
         return;
       }
 
       console.log('GPX data parsed successfully from file');
-      const points = parsedFile.tracks[0].points.map((p) => ({
+      const points = parsed.tracks[0].points.map((p) => ({
         x: p.lon,
         y: p.lat,
         z: p.ele,
@@ -156,6 +156,11 @@ function handleFileUpload(event) {
         const z = THREE.MathUtils.mapLinear(p.y, minY, maxY, -5, 5);
         return new THREE.Vector3(x, y, z);
       }).filter(p => p !== null);
+
+      if (normalizedPoints.length === 0) {
+        console.error('No valid points found in GPX file.');
+        return;
+      }
 
       console.log('Normalized Points from file:', normalizedPoints);
       renderTrack(normalizedPoints, 'gpx-track', 0x00ffff);
