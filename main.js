@@ -77,6 +77,33 @@ scene.add(directionalLight);
 // --- Controls ---
 const controls = new OrbitControls(camera, renderer.domElement);
 
+const curve = new THREE.CatmullRomCurve3( [
+	new THREE.Vector3( -10, 0, 10 ),
+	new THREE.Vector3( -5, 5, 5 ),
+	new THREE.Vector3( 0, 0, 0 ),
+	new THREE.Vector3( 5, -5, 5 ),
+	new THREE.Vector3( 10, 0, 10 )
+] );
+
+const points = curve.getPoints( 50 );
+renderTrack(points, 'hard-coded-track', 0xff00ff);
+// renderTerrain(points);
+
+// --- Adjust Camera ---
+const boundingBox = new THREE.Box3().setFromPoints(points);
+const center = new THREE.Vector3();
+boundingBox.getCenter(center);
+const size = new THREE.Vector3();
+boundingBox.getSize(size);
+
+const maxDim = Math.max(size.x, size.y, size.z);
+const fov = camera.fov * (Math.PI / 180);
+let cameraZ = Math.abs((maxDim / 2) * Math.tan(fov * 2));
+cameraZ *= 1.5; // Add some padding
+
+camera.position.set(center.x, center.y, center.z + cameraZ);
+controls.target.copy(center);
+
 // --- GPX File Loading ---
 const fileInput = document.getElementById('gpx-file');
 fileInput.addEventListener('change', handleFileUpload);
