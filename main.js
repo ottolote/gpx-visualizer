@@ -138,6 +138,17 @@ fetch('/Trebeurden_Lannion_parcours13.2RE.gpx')
     }
   });
 
+const curve = new THREE.CatmullRomCurve3( [
+	new THREE.Vector3( -10, 0, 10 ),
+	new THREE.Vector3( -5, 5, 5 ),
+	new THREE.Vector3( 0, 0, 0 ),
+	new THREE.Vector3( 5, -5, 5 ),
+	new THREE.Vector3( 10, 0, 10 )
+] );
+
+const points = curve.getPoints( 50 );
+renderTrack(points, 'hard-coded-track', 0xff00ff);
+
 function loadAndRenderGpx(gpxData) {
   try {
     const [parsedFile, error] = parseGPX(gpxData);
